@@ -1,0 +1,30 @@
+{
+  "name": "codex-forge",
+  "version": "0.1.0",
+  "description": "Automatically builds and maintains a repository Harness knowledge base for Codex.",
+  "author": {
+    "name": "Codex Forge contributors"
+  },
+  "keywords": [
+    "codex",
+    "harness",
+    "knowledge-base",
+    "exec-plan"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Forge",
+    "shortDescription": "Automatically maintain repository Harness knowledge",
+    "longDescription": "Classifies repository tasks, manages ExecPlan lifecycles, refreshes deterministic repository knowledge, and keeps navigation indexes current without manual commands.",
+    "developerName": "Codex Forge contributors",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Work on this repository and maintain its Harness automatically.",
+      "Implement this task with automatic planning and knowledge updates."
+    ]
+  }
+}

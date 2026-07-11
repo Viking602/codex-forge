@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Forge"
+  short_description: "自动评估任务并维护仓库级 Harness 知识体系"
+  default_prompt: "自动评估当前任务并维护仓库 Harness 知识。"

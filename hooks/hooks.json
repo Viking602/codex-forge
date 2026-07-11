@@ -1,0 +1,54 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/skills/codex-forge/scripts/forge.py hook",
+            "timeout": 30,
+            "statusMessage": "Loading repository Harness"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/skills/codex-forge/scripts/forge.py hook",
+            "timeout": 30,
+            "statusMessage": "Assessing task and routing artifacts"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/skills/codex-forge/scripts/forge.py hook",
+            "timeout": 30,
+            "statusMessage": "Refreshing Harness knowledge"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${PLUGIN_ROOT}/skills/codex-forge/scripts/forge.py hook",
+            "timeout": 180,
+            "statusMessage": "Verifying and archiving Harness artifacts"
+          }
+        ]
+      }
+    ]
+  }
+}
