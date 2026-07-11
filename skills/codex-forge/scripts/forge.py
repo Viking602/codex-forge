@@ -27,7 +27,7 @@ RISK_TERMS = re.compile(
     re.I,
 )
 STANDARD_TERMS = re.compile(
-    r"新增|功能|重构|多文件|分阶段|实现|feature|refactor|multi[- ]file|implement|end[- ]to[- ]end",
+    r"新增|增加|功能|重构|多文件|分阶段|实现|feature|refactor|multi[- ]file|implement|end[- ]to[- ]end",
     re.I,
 )
 BLOCKED_TERMS = re.compile(r"\bblocked\b|阻塞|缺少凭据|需要用户|无法继续", re.I)

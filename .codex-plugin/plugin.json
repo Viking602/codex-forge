@@ -1,6 +1,6 @@
 {
   "name": "codex-forge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Automatically builds and maintains a repository Harness knowledge base for Codex.",
   "author": {
     "name": "Codex Forge contributors"
@@ -24,7 +24,8 @@
     ],
     "defaultPrompt": [
       "Work on this repository and maintain its Harness automatically.",
-      "Implement this task with automatic planning and knowledge updates."
+      "Implement this task with automatic planning and knowledge updates.",
+      "Initialize Harness documentation in this repository."
     ]
   }
 }

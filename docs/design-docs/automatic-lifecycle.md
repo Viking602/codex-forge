@@ -9,6 +9,8 @@ last_verified: 2026-07-11
 
 `SessionStart` bootstraps routing and deterministic knowledge. `UserPromptSubmit` classifies the task and creates an ExecPlan only for standard or large work. `PostToolUse` refreshes generated knowledge and records mechanical progress. `Stop` runs the detected repository verification and archives a passing plan.
 
+An explicit `$codex-forge-init` invocation runs the same bootstrap and freshness check immediately. It is a user-controlled entrypoint, not a second initialization implementation.
+
 ## Invariants
 
 - Human text outside `codex-forge:managed` blocks is preserved.

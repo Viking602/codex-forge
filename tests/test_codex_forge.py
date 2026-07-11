@@ -42,7 +42,18 @@ class CodexForgeTest(unittest.TestCase):
     def test_classifies_tasks_without_unneeded_plans(self):
         self.assertEqual("lightweight", forge.assess("修正文档错别字").level)
         self.assertEqual("standard", forge.assess("实现一个普通功能并补测试").level)
+        self.assertEqual("standard", forge.assess("增加一个初始化的指令").level)
         self.assertEqual("large", forge.assess("迁移数据库并修改公共 API").level)
+
+    def test_bootstrap_command_initializes_current_repository(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = forge.main(["bootstrap", "--repo", str(self.root)])
+        self.assertEqual(0, result)
+        self.assertIn("Bootstrapped", output.getvalue())
+        self.assertTrue((self.root / "AGENTS.md").exists())
+        self.assertTrue((self.root / "ARCHITECTURE.md").exists())
+        self.assertTrue((self.root / "docs/generated/repository-map.md").exists())
 
     def test_bootstrap_is_deterministic_and_preserves_human_text(self):
         (self.root / "AGENTS.md").write_text("# Team Rules\n\nKeep this.\n", encoding="utf-8")

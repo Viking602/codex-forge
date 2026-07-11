@@ -1,0 +1,7 @@
+interface:
+  display_name: "Initialize Codex Forge"
+  short_description: "Initialize Harness documentation in this repository"
+  default_prompt: "Use $codex-forge-init to initialize Harness documentation in this repository."
+
+policy:
+  allow_implicit_invocation: false

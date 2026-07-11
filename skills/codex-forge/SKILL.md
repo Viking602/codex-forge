@@ -30,3 +30,5 @@ Treat the repository as the knowledge base. Hooks bootstrap and inspect the Harn
 - If a real credential, destructive-action, identity, or instruction-conflict blocker remains, record it in the active plan and report it; do not fake completion.
 
 The deterministic manager is at `scripts/forge.py`. Run it directly only for plugin development or recovery; normal users rely on hooks.
+
+Use `$codex-forge-init` when the user explicitly wants to initialize the current repository's Harness documentation immediately.
