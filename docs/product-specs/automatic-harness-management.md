@@ -1,6 +1,6 @@
 ---
 status: implemented
-last_verified: 2026-07-11
+last_verified: 2026-07-13
 ---
 
 # Automatic Harness Management
@@ -15,6 +15,7 @@ When Codex works in a repository with Codex Forge enabled, the repository gains 
 - Users can explicitly invoke `$codex-forge-init` to initialize or repair the current repository immediately.
 - Tasks are classified as lightweight, standard, or large from risk, scope, and prompt signals.
 - Standard and large tasks receive one dated Active ExecPlan; lightweight tasks receive none.
+- Before an Active ExecPlan is created, the model analyzes the concrete task intent and supplies a concise semantic title; no prompt-derived or placeholder plan file is created first.
 - Repository and verification maps plus design and product indexes are refreshed deterministically.
 - The Stop lifecycle runs one repository-native verification command when detected.
 - Passing plans move to `docs/exec-plans/completed/`; failures or blockers remain active.

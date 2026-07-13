@@ -1,6 +1,6 @@
 {
   "name": "codex-forge",
-  "version": "0.2.0",
+  "version": "0.2.0+codex.20260713022835",
   "description": "Automatically builds and maintains a repository Harness knowledge base for Codex.",
   "author": {
     "name": "Codex Forge contributors"

@@ -9,7 +9,7 @@ The plugin is implemented with Python's standard library and writes its durable 
 | Lifecycle event | Action |
 | --- | --- |
 | `SessionStart` | Creates or repairs the repository's Harness entrypoints and generated maps. |
-| `UserPromptSubmit` | Classifies the task as lightweight, standard, or large. Standard and large tasks receive an active ExecPlan. |
+| `UserPromptSubmit` | Classifies the task and stores its context. For standard and large work, the model analyzes intent and supplies the title before the active ExecPlan is created. |
 | `PostToolUse` | Refreshes generated knowledge and records mechanical progress after repository writes. |
 | `Stop` | Runs one detected repository-native verification command and archives a passing ExecPlan. |
 
@@ -66,6 +66,8 @@ The initialization skill runs the same deterministic bootstrap and freshness che
 - **Lightweight:** bounded, low-risk work; no ExecPlan is created.
 - **Standard:** multi-step implementation work; one active ExecPlan is maintained.
 - **Large:** work involving durable boundaries such as architecture, migrations, databases, authentication, security, or public APIs; one active ExecPlan is maintained and durable knowledge is reconciled.
+
+For standard and large tasks, Codex Forge does not derive a filename from the prompt. The model first identifies the concrete intent and generates a semantic title, then the lifecycle manager creates the final dated plan file.
 
 If a lightweight task expands across multiple files, Codex Forge promotes it to standard work.
 

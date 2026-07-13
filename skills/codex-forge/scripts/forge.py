@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
@@ -75,13 +76,15 @@ def assess(prompt: str) -> Assessment:
     return Assessment("lightweight", ("bounded low-risk change",))
 
 
-def slugify(prompt: str) -> str:
-    first = next((line.strip("# -*\t") for line in prompt.splitlines() if line.strip()), "task")
-    value = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", "-", first.lower()).strip("-")
-    return (value[:48].rstrip("-") or "task")
+def normalize_plan_title(value: str) -> tuple[str, str]:
+    title = " ".join(value.strip("# -*\t").split())
+    slug = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", "-", title.lower()).strip("-")
+    if not title or title == "<MODEL_GENERATED_TITLE>" or not slug or len(title) > 80:
+        raise ValueError("plan title must be a model-generated semantic title of 1-80 filename-safe characters")
+    return title, slug
 
 
-def plan_template(prompt: str, assessment: Assessment) -> str:
+def plan_template(prompt: str, assessment: Assessment, title: str) -> str:
     summary = " ".join(prompt.split())[:500]
     reasons = "; ".join(assessment.reasons)
     return f"""---
@@ -90,7 +93,7 @@ task_class: {assessment.level}
 created: {date.today().isoformat()}
 ---
 
-# {slugify(prompt).replace('-', ' ').title()}
+# {title}
 
 ## Purpose / Big Picture
 
@@ -150,15 +153,40 @@ Task: {summary}
 """
 
 
-def ensure_plan(root: Path, prompt: str, assessment: Assessment) -> Path | None:
-    if assessment.level == "lightweight":
-        return None
+def ensure_plan(root: Path, prompt: str, assessment: Assessment, title: str) -> Path:
+    title, slug = normalize_plan_title(title)
     active = root / "docs" / "exec-plans" / "active"
     active.mkdir(parents=True, exist_ok=True)
-    path = active / f"{date.today().isoformat()}-{slugify(prompt)}.md"
-    if not path.exists():
-        atomic_write(path, plan_template(prompt, assessment))
+    path = active / f"{date.today().isoformat()}-{slug}.md"
+    if path.exists():
+        raise ValueError(f"an active plan named {path.name} already exists; generate a more specific title")
+    atomic_write(path, plan_template(prompt, assessment, title))
     return path
+
+
+def plan_creation_instruction(root: Path, session_id: str) -> str:
+    command = shlex.join(
+        [sys.executable, str(Path(__file__).resolve()), "start-plan", "--repo", str(root), "--session-id", session_id, "--title", "<MODEL_GENERATED_TITLE>"]
+    )
+    return (
+        "Before creating any ExecPlan, analyze the concrete task intent and generate a concise semantic plan title. "
+        f"Then replace <MODEL_GENERATED_TITLE> and run `{command}`. Do not copy or truncate the current prompt."
+    )
+
+
+def start_plan(root: Path, session_id: str, title: str) -> Path:
+    state = load_state(session_id)
+    existing = Path(state["plan"]) if state.get("plan") else None
+    if existing and existing.exists():
+        return existing
+    if state.get("root") != str(root) or state.get("level") not in {"standard", "large"}:
+        raise ValueError("no pending standard or large task exists for this repository and session")
+    assessment = Assessment(state["level"], tuple(state.get("reasons", [])))
+    plan = ensure_plan(root, state.get("prompt", ""), assessment, title)
+    state["plan"] = str(plan)
+    save_state(session_id, state)
+    refresh(root)
+    return plan
 
 
 def replace_section_line(path: Path, marker: str, line: str) -> None:
@@ -257,10 +285,19 @@ def on_user_prompt(root: Path, session_id: str, data: dict[str, Any]) -> int:
     bootstrap(root)
     prompt = str(data.get("prompt", ""))
     assessment = assess(prompt)
-    plan = ensure_plan(root, prompt, assessment)
-    save_state(session_id, {"root": str(root), "level": assessment.level, "plan": str(plan) if plan else "", "touched": []})
+    save_state(
+        session_id,
+        {
+            "root": str(root),
+            "level": assessment.level,
+            "reasons": list(assessment.reasons),
+            "prompt": prompt,
+            "plan": "",
+            "touched": [],
+        },
+    )
     context = f"Codex Forge classified this task as {assessment.level}: {'; '.join(assessment.reasons)}. "
-    context += f"Maintain the active ExecPlan at {plan.relative_to(root)}." if plan else "Do not create an ExecPlan or Product Spec for this task."
+    context += plan_creation_instruction(root, session_id) if assessment.level != "lightweight" else "Do not create an ExecPlan or Product Spec for this task."
     context += " Reconcile durable knowledge before the final response; never hand-edit docs/generated/."
     hook_output(context, "UserPromptSubmit")
     return 0
@@ -268,19 +305,18 @@ def on_user_prompt(root: Path, session_id: str, data: dict[str, Any]) -> int:
 
 def on_post_tool(root: Path, session_id: str, data: dict[str, Any]) -> int:
     state = load_state(session_id)
-    plan = Path(state["plan"]) if state.get("plan") else None
+    plan = Path(state["plan"]) if state.get("plan") and Path(state["plan"]).exists() else None
     command = str((data.get("tool_input") or {}).get("command", ""))
     touched = set(state.get("touched", []))
     touched.update(re.findall(r"\*\*\* (?:Add|Update|Delete) File: ([^\n]+)", command))
     state["touched"] = sorted(touched)
     if state.get("level") == "lightweight" and len(touched) > 1:
         assessment = Assessment("standard", ("task expanded beyond one file",))
-        plan = ensure_plan(root, "Expanded multi-file task", assessment)
-        state.update(level="standard", plan=str(plan))
+        state.update(level="standard", reasons=list(assessment.reasons))
     record_progress(plan, f"Automatic activity: `{data.get('tool_name', 'tool')}` completed; {len(touched)} changed file(s) observed.")
     save_state(session_id, state)
     refresh(root)
-    hook_output("", "PostToolUse")
+    hook_output(plan_creation_instruction(root, session_id) if state.get("level") != "lightweight" and not plan else "", "PostToolUse")
     return 0
 
 
@@ -289,11 +325,15 @@ def on_stop(root: Path, session_id: str, data: dict[str, Any]) -> int:
         hook_output("", "Stop")
         return 0
     state = load_state(session_id)
-    plan = Path(state["plan"]) if state.get("plan") else None
+    plan = Path(state["plan"]) if state.get("plan") and Path(state["plan"]).exists() else None
     if BLOCKED_TERMS.search(str(data.get("last_assistant_message", ""))):
         record_progress(plan, "Paused at a reported hard blocker; plan remains active.")
         refresh(root)
         hook_output("The active plan remains unarchived because the turn reported a blocker.", "Stop")
+        return 0
+    if state.get("level") in {"standard", "large"} and not plan:
+        refresh(root)
+        print(json.dumps({"decision": "block", "reason": plan_creation_instruction(root, session_id)}, ensure_ascii=False))
         return 0
     refresh(root)
     passed, evidence = run_verification(root)
@@ -334,9 +374,11 @@ def handle_hook(data: dict[str, Any]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("bootstrap", "refresh", "assess", "check", "complete", "hook"))
+    parser.add_argument("command", choices=("bootstrap", "refresh", "assess", "check", "complete", "start-plan", "hook"))
     parser.add_argument("--repo", default=".")
     parser.add_argument("--prompt", default="")
+    parser.add_argument("--session-id", default="")
+    parser.add_argument("--title", default="")
     args = parser.parse_args(argv)
     if args.command == "hook":
         try:
@@ -353,6 +395,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Refreshed {root}; {len(changed)} file(s) changed.")
     elif args.command == "assess":
         print(json.dumps(asdict(assess(args.prompt)), ensure_ascii=False))
+    elif args.command == "start-plan":
+        try:
+            plan = start_plan(root, args.session_id, args.title)
+        except ValueError as error:
+            parser.error(str(error))
+        print(f"Created {plan.relative_to(root)}.")
     elif args.command == "check":
         issues = check_stale(root)
         if issues:

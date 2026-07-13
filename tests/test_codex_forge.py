@@ -39,6 +39,15 @@ class CodexForgeTest(unittest.TestCase):
             forge.handle_hook(payload)
         return json.loads(output.getvalue())
 
+    def start_plan(self, title="交付验证流程"):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = forge.main(
+                ["start-plan", "--repo", str(self.root), "--session-id", "test", "--title", title]
+            )
+        self.assertEqual(0, result)
+        return next((self.root / "docs/exec-plans/active").glob("*.md"))
+
     def test_classifies_tasks_without_unneeded_plans(self):
         self.assertEqual("lightweight", forge.assess("修正文档错别字").level)
         self.assertEqual("standard", forge.assess("实现一个普通功能并补测试").level)
@@ -67,15 +76,31 @@ class CodexForgeTest(unittest.TestCase):
         self.assertTrue((self.root / "docs/product-specs/index.md").exists())
 
     def test_standard_task_creates_and_archives_exec_plan(self):
-        self.hook("UserPromptSubmit", prompt="实现一个普通功能并补测试")
+        result = self.hook("UserPromptSubmit", prompt="实现一个普通功能并补测试")
         active = list((self.root / "docs/exec-plans/active").glob("*.md"))
-        self.assertEqual(1, len(active))
+        self.assertEqual([], active)
+        self.assertIn("analyze the concrete task intent", result["hookSpecificOutput"]["additionalContext"])
+        self.assertIn("start-plan", result["hookSpecificOutput"]["additionalContext"])
+        with self.assertRaises(ValueError):
+            forge.start_plan(self.root, "test", "<MODEL_GENERATED_TITLE>")
+        self.assertEqual([], list((self.root / "docs/exec-plans/active").glob("*.md")))
+        plan = self.start_plan()
+        self.assertEqual("交付验证流程.md", plan.name[11:])
+        self.assertIn("# 交付验证流程", plan.read_text(encoding="utf-8"))
         result = self.hook("Stop", stop_hook_active=False, last_assistant_message="已完成")
         self.assertIn("Archived", result["systemMessage"])
         self.assertEqual([], list((self.root / "docs/exec-plans/active").glob("*.md")))
         completed = list((self.root / "docs/exec-plans/completed").glob("*.md"))
         self.assertEqual(1, len(completed))
+        self.assertEqual("交付验证流程.md", completed[0].name[11:])
         self.assertIn("status: completed", completed[0].read_text(encoding="utf-8"))
+
+    def test_stop_requires_intent_analysis_and_plan_creation(self):
+        self.hook("UserPromptSubmit", prompt="实现一个普通功能并补测试")
+        result = self.hook("Stop", stop_hook_active=False, last_assistant_message="已完成")
+        self.assertEqual("block", result["decision"])
+        self.assertIn("analyze the concrete task intent", result["reason"])
+        self.assertEqual([], list((self.root / "docs/exec-plans/active").glob("*.md")))
 
     def test_lightweight_task_never_creates_plan(self):
         self.hook("UserPromptSubmit", prompt="修正文档错别字")
@@ -86,10 +111,11 @@ class CodexForgeTest(unittest.TestCase):
     def test_multi_file_edit_escalates_lightweight_task(self):
         self.hook("UserPromptSubmit", prompt="小修正")
         patch_text = "*** Add File: one.txt\n*** Add File: two.txt\n"
-        self.hook("PostToolUse", tool_name="apply_patch", tool_input={"command": patch_text})
+        result = self.hook("PostToolUse", tool_name="apply_patch", tool_input={"command": patch_text})
         plans = list((self.root / "docs/exec-plans/active").glob("*.md"))
-        self.assertEqual(1, len(plans))
-        self.assertIn("task_class: standard", plans[0].read_text(encoding="utf-8"))
+        self.assertEqual([], plans)
+        self.assertIn("start-plan", result["systemMessage"])
+        self.assertIn("task_class: standard", self.start_plan().read_text(encoding="utf-8"))
 
     def test_failed_verification_keeps_plan_active(self):
         (self.root / "tests").mkdir()
@@ -98,6 +124,7 @@ class CodexForgeTest(unittest.TestCase):
             encoding="utf-8",
         )
         self.hook("UserPromptSubmit", prompt="实现一个普通功能并补测试")
+        self.start_plan()
         result = self.hook("Stop", stop_hook_active=False, last_assistant_message="已完成")
         self.assertEqual("block", result["decision"])
         self.assertEqual(1, len(list((self.root / "docs/exec-plans/active").glob("*.md"))))

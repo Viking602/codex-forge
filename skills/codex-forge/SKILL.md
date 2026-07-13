@@ -12,8 +12,8 @@ Treat the repository as the knowledge base. Hooks bootstrap and inspect the Harn
 1. Read `AGENTS.md`, `ARCHITECTURE.md`, and only the routed documents relevant to the task.
 2. Accept the automatic task class unless concrete scope proves it wrong:
    - `lightweight`: execute directly; do not create a plan or spec.
-   - `standard`: use the active ExecPlan created by the hook.
-   - `large`: use the active ExecPlan and update durable architecture, design, or product knowledge only when behavior truly changes.
+   - `standard`: analyze the concrete intent, generate a concise semantic plan title, run the hook-injected `start-plan` command, then use the resulting active ExecPlan.
+   - `large`: create the active ExecPlan through the same intent-first flow and update durable architecture, design, or product knowledge only when behavior truly changes.
 3. Keep `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` current at meaningful milestones. Hooks record mechanical activity; replace that with semantic facts when useful.
 4. Search existing knowledge before writing. Merge or correct an existing topic before creating another file, then refresh its index.
 5. Never hand-edit `docs/generated/`. The lifecycle hook deterministically rebuilds it from repository state.
